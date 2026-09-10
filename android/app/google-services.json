@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "480472838877",
+    "project_id": "the-captain-846db",
+    "storage_bucket": "the-captain-846db.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:480472838877:android:1045c3b5a1d438a7e36134",
+        "android_client_info": {
+          "package_name": "com.thecaptain.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBEdLCqNd6jVsMTvltusCN2uW_CFV8Yy04"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

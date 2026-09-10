@@ -1,0 +1,1 @@
+UPDATE public.profiles SET avatar = '⛈️' WHERE avatar = '⚡';

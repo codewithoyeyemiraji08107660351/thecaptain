@@ -1,0 +1,15 @@
+{
+    "imports": {
+      "std/": "https://deno.land/std@0.168.0/",
+      "esm/": "https://esm.sh/"
+    },
+    "tasks": {
+      "start": "deno run --allow-net --allow-env index.ts",
+      "deploy": "supabase functions deploy send-notification"
+    },
+    "compilerOptions": {
+      "strict": true,
+      "noImplicitAny": true,
+      "strictNullChecks": true
+    }
+  }

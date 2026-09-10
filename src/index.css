@@ -1,0 +1,135 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 7%;
+    --foreground: 210 20% 92%;
+
+    --card: 220 18% 11%;
+    --card-foreground: 210 20% 92%;
+
+    --popover: 220 18% 13%;
+    --popover-foreground: 210 20% 92%;
+
+    --primary: 175 85% 55%;
+    --primary-foreground: 220 20% 7%;
+
+    --secondary: 220 15% 18%;
+    --secondary-foreground: 210 20% 85%;
+
+    --muted: 220 15% 15%;
+    --muted-foreground: 215 15% 55%;
+
+    --accent: 12 90% 62%;
+    --accent-foreground: 220 20% 7%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 220 15% 20%;
+    --input: 220 15% 20%;
+    --ring: 175 85% 55%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 220 18% 9%;
+    --sidebar-foreground: 210 20% 92%;
+    --sidebar-primary: 175 85% 55%;
+    --sidebar-primary-foreground: 220 20% 7%;
+    --sidebar-accent: 220 15% 15%;
+    --sidebar-accent-foreground: 210 20% 85%;
+    --sidebar-border: 220 15% 20%;
+    --sidebar-ring: 175 85% 55%;
+
+    --glow-primary: 175 85% 55%;
+    --glow-accent: 12 90% 62%;
+    --success: 145 70% 50%;
+    --success-foreground: 220 20% 7%;
+
+    --super: 270 80% 60%;
+    --super-foreground: 220 20% 98%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
+  *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+
+  [data-radix-scroll-area-scrollbar] {
+    display: none !important;
+  }
+}
+
+@layer utilities {
+  .glow-primary {
+    box-shadow: 0 0 20px hsl(var(--glow-primary) / 0.3), 0 0 60px hsl(var(--glow-primary) / 0.1);
+  }
+
+  .glow-accent {
+    box-shadow: 0 0 20px hsl(var(--glow-accent) / 0.3), 0 0 60px hsl(var(--glow-accent) / 0.1);
+  }
+
+  .glow-super {
+    box-shadow: 0 0 20px hsl(var(--super) / 0.3), 0 0 60px hsl(var(--super) / 0.1);
+  }
+
+  .text-gradient-primary {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, hsl(var(--primary)), hsl(175 95% 70%));
+  }
+
+  .text-gradient-accent {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, hsl(var(--accent)), hsl(30 90% 65%));
+  }
+
+  .text-gradient-super {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, hsl(var(--super)), hsl(290 90% 70%));
+  }
+
+  .card-game {
+    background: var(--theme-card-gradient, linear-gradient(135deg, hsl(var(--card)), hsl(220 18% 14%)));
+    border: 1px solid hsl(var(--border));
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+}
+
+/* Easter egg: when inverted, preserve emoji icons, rank badges, strikes and warnings */
+.easter-egg-inverted .invert-protect {
+  filter: invert(1);
+}
+
+/* Keep photos, GIFs, and camera uploads from having negative filter applied */
+.easter-egg-inverted img {
+  filter: invert(1);
+}
+
+/* Hide Lovable badge globally */
+#lovable-badge {
+  display: none !important;
+}

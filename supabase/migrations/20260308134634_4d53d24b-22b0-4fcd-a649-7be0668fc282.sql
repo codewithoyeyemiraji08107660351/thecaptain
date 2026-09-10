@@ -1,0 +1,1 @@
+ALTER TABLE public.squads ALTER COLUMN punishment_duration_hours SET DEFAULT 6;

@@ -1,0 +1,1 @@
+ALTER TABLE public.squads ALTER COLUMN captain_fail_limit SET DEFAULT 3;
