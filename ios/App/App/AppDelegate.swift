@@ -8,10 +8,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Start Firebase before any plugin touches it (push notifications need this)
-        if FirebaseApp.app() == nil {
-            FirebaseApp.configure()
-        }
+        // Start Firebase before any plugin touches it (push notifications need this).
+        // Called directly: checking FirebaseApp.app() first logs a false "not configured" error.
+        FirebaseApp.configure()
         return true
     }
 
