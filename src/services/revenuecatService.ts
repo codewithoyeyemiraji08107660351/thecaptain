@@ -67,9 +67,9 @@ class RevenueCatService {
     if (!Capacitor.isNativePlatform()) {
       throw new Error('RevenueCat only available on native platforms');
     }
-    
+
     const platform = Capacitor.getPlatform();
-    
+
     if (platform === 'android') {
       const key = import.meta.env.VITE_REVENUECAT_ANDROID_API_KEY;
       if (!key) throw new Error('Missing RevenueCat Android API key');
@@ -79,21 +79,43 @@ class RevenueCatService {
       if (!key) throw new Error('Missing RevenueCat iOS API key');
       return key;
     }
-    
+
     throw new Error('Unsupported platform for RevenueCat');
   }
 
+  /**
+   * Entry point called on app start / whenever the auth user changes.
+   *
+   * IMPORTANT: Purchases.configure() must only ever be called ONCE per
+   * app session. Switching or clearing the logged-in user afterwards must
+   * go through Purchases.logIn() / Purchases.logOut() (i.e. setUserID() /
+   * logout() below), never through a second configure() call — calling
+   * configure() twice can leave the native SDK in an inconsistent state
+   * and misattribute pending transactions or entitlements.
+   */
   async initialize(userId?: string | null): Promise<void> {
     if (!Capacitor.isNativePlatform()) {
       logger.log('Not on native platform, skipping RevenueCat init');
       return;
     }
-    
-    if (this.initialized && this.currentUserId === userId) {
-      logger.log('RevenueCat already initialized for this user');
+
+    // Already configured: this call represents a user switch or a
+    // sign-out, not a first-time init. Route it through logIn/logOut
+    // instead of falling through to configure() again.
+    if (this.initialized) {
+      if (this.currentUserId === userId) {
+        logger.log('RevenueCat already initialized for this user');
+        return;
+      }
+
+      if (userId) {
+        await this.setUserID(userId);
+      } else {
+        await this.logout();
+      }
       return;
     }
-    
+
     if (this.initPromise) {
       await this.initPromise;
       return;
@@ -119,36 +141,45 @@ class RevenueCatService {
     }
   }
 
+  // Called exactly once per app session. Performs the real
+  // Purchases.configure() call.
   private async _initialize(userId?: string | null): Promise<void> {
     try {
       const apiKey = this.getApiKey();
-      
+
       const configuration: PurchasesConfiguration = {
         apiKey: apiKey,
         appUserID: userId || null,
       };
-      
+
       await Purchases.configure(configuration);
-      
-      await Purchases.setLogLevel({ 
+
+      await Purchases.setLogLevel({
         level: this.isProduction ? LOG_LEVEL.ERROR : LOG_LEVEL.DEBUG
       });
-      
+
       this.setupCustomerInfoListener();
-      
+
       if (userId) {
         const result = await Purchases.logIn({ appUserID: userId });
         this.customerInfo = result.customerInfo;
         this.currentUserId = userId;
         logger.log(`User logged in: ${userId.substring(0, 8)}... (${result.created ? 'new' : 'existing'})`);
       }
-      
+
       await Purchases.syncPurchases();
       await this.refreshCustomerInfo();
-      
+
+      // Mark configured BEFORE loading offerings so that a user-switch
+      // race (initialize() called again while this is in flight) is
+      // correctly routed through the "already initialized" branch above
+      // rather than triggering a second configure().
       this.initialized = true;
+
+      await this.loadOfferings();
+
       logger.log(`✅ RevenueCat initialized (${this.isProduction ? 'PRODUCTION' : 'DEVELOPMENT'})`);
-      
+
     } catch (error) {
       logger.error('❌ RevenueCat initialization failed:', error);
       this.initialized = false;
@@ -172,31 +203,31 @@ class RevenueCatService {
 
   async loadOfferings(): Promise<void> {
     if (!Capacitor.isNativePlatform()) return;
-    
+
     if (!this.initialized) {
       logger.warn('Cannot load offerings: RevenueCat not initialized');
       return;
     }
-    
+
     try {
       const offerings = await Purchases.getOfferings();
-      
+
       if (!offerings.current) {
         logger.warn('No current offering available');
         return;
       }
-      
+
       const allPackages = offerings.current.availablePackages || [];
       this.cachedPackages.clear();
-      
+
       logger.log(`📦 Found ${allPackages.length} packages in offering`);
-      
+
       for (const pkg of allPackages) {
         const identifier = pkg.product.identifier;
         logger.log(`Processing package: ${identifier} (${pkg.product.title})`);
-        
+
         const type = PRODUCT_MAP[identifier];
-        
+
         if (type) {
           this.cachedPackages.set(type, {
             package: pkg,
@@ -212,13 +243,16 @@ class RevenueCatService {
           });
           logger.log(`✅ Mapped ${identifier} -> ${type}, Price: ${pkg.product.priceString}`);
         } else {
-          logger.warn(`⚠️ Unknown product identifier: ${identifier}`);
+          // Always logged (not DEV-gated): a mismatch here means real
+          // purchases in the store won't be sellable in the app, which
+          // needs to be visible in production diagnostics/crash tooling.
+          logger.error(`⚠️ Unknown product identifier from store: "${identifier}". Check PRODUCT_MAP against App Store Connect / Play Console / RevenueCat dashboard.`);
         }
       }
-      
+
       this.offeringsLoaded = true;
       logger.log(`✅ Loaded ${this.cachedPackages.size} packages: ${Array.from(this.cachedPackages.keys()).join(', ')}`);
-      
+
     } catch (error) {
       logger.error('Failed to load offerings:', error);
       this.offeringsLoaded = false;
@@ -227,43 +261,44 @@ class RevenueCatService {
 
   addCustomerInfoUpdateListener(callback: (customerInfo: CustomerInfo) => void): () => void {
     this.customerInfoCallbacks.push(callback);
-    
+
     if (this.customerInfo) {
       callback(this.customerInfo);
     }
-    
+
     return () => {
       const index = this.customerInfoCallbacks.indexOf(callback);
       if (index !== -1) this.customerInfoCallbacks.splice(index, 1);
     };
   }
 
+  // Switches the logged-in RevenueCat user WITHOUT re-configuring the SDK.
   async setUserID(userId: string): Promise<void> {
     if (!userId) {
       logger.warn('Cannot set empty user ID');
       return;
     }
-    
+
     if (!Capacitor.isNativePlatform()) return;
-    
+
     if (this.initialized && this.currentUserId === userId) {
       logger.log('Already using this user ID');
       return;
     }
-    
+
     if (this.initialized && this.currentUserId !== userId) {
       try {
         const result = await Purchases.logIn({ appUserID: userId });
         this.customerInfo = result.customerInfo;
         this.currentUserId = userId;
-        
+
         await Purchases.syncPurchases();
         await this.loadOfferings();
-        
+
         if (this.customerInfo) {
           this.customerInfoCallbacks.forEach(cb => cb(this.customerInfo!));
         }
-        
+
         logger.log(`✅ RevenueCat user switched to: ${userId.substring(0, 8)}... (${result.created ? 'new' : 'existing'})`);
         return;
       } catch (error) {
@@ -271,16 +306,25 @@ class RevenueCatService {
         throw error;
       }
     }
-    
+
     if (!this.initialized) {
       await this.initialize(userId);
       return;
     }
   }
 
+  // Logs the current user out to an anonymous RevenueCat ID.
+  // Does NOT un-configure the SDK — `initialized` stays true, matching
+  // Purchases.logOut()'s own semantics.
   async logout(): Promise<void> {
     if (!Capacitor.isNativePlatform()) return;
-    
+
+    if (!this.initialized) {
+      // Nothing was ever configured — nothing to log out of.
+      this.currentUserId = null;
+      return;
+    }
+
     try {
       await Purchases.logOut();
       this.customerInfo = null;
@@ -295,7 +339,7 @@ class RevenueCatService {
 
   async refreshCustomerInfo(): Promise<CustomerInfo | null> {
     if (!Capacitor.isNativePlatform()) return null;
-    
+
     if (!this.initialized) {
       if (this.currentUserId) {
         await this.initialize(this.currentUserId);
@@ -303,7 +347,7 @@ class RevenueCatService {
         return null;
       }
     }
-    
+
     try {
       const result = await Purchases.getCustomerInfo();
       this.customerInfo = result.customerInfo;
@@ -316,14 +360,14 @@ class RevenueCatService {
 
   async isPremium(): Promise<boolean> {
     if (!Capacitor.isNativePlatform()) return false;
-    
+
     try {
       const customerInfo = await this.refreshCustomerInfo();
       if (!customerInfo) return false;
-      
+
       const entitlement = customerInfo.entitlements.active[PREMIUM_ENTITLEMENT_ID];
       const hasPremium = entitlement?.isActive === true;
-      
+
       return hasPremium;
     } catch (error) {
       logger.error('Failed to check premium status:', error);
@@ -337,17 +381,17 @@ class RevenueCatService {
     originalPurchaseDate?: Date;
   }> {
     if (!Capacitor.isNativePlatform()) return { isActive: false };
-    
+
     try {
       const customerInfo = await this.refreshCustomerInfo();
       if (!customerInfo) return { isActive: false };
-      
+
       const entitlement = customerInfo.entitlements.active[PREMIUM_ENTITLEMENT_ID];
-      
+
       if (!entitlement?.isActive) {
         return { isActive: false };
       }
-      
+
       return {
         isActive: true,
         productId: entitlement.productIdentifier,
@@ -364,11 +408,11 @@ class RevenueCatService {
       logger.warn('RevenueCat not initialized');
       return null;
     }
-    
+
     if (!this.offeringsLoaded) {
       await this.loadOfferings();
     }
-    
+
     return this.cachedPackages.get(type) || null;
   }
 
@@ -377,30 +421,30 @@ class RevenueCatService {
       logger.warn('RevenueCat not initialized');
       return [];
     }
-    
+
     if (!this.offeringsLoaded) {
       await this.loadOfferings();
     }
-    
+
     return Array.from(this.cachedPackages.values());
   }
 
-  async purchasePackage(type: PackageType): Promise<{ 
-    success: boolean; 
-    customerInfo?: CustomerInfo; 
+  async purchasePackage(type: PackageType): Promise<{
+    success: boolean;
+    customerInfo?: CustomerInfo;
     error?: string;
     errorCode?: string;
   }> {
     if (!Capacitor.isNativePlatform()) {
       return { success: false, error: 'Purchases only available in mobile app' };
     }
-    
+
     if (!this.initialized) {
       return { success: false, error: 'Purchase system not initialized' };
     }
-    
+
     const packageInfo = await this.getPackage(type);
-    
+
     if (!packageInfo) {
       return { success: false, error: `Package ${type} not available` };
     }
@@ -412,45 +456,45 @@ class RevenueCatService {
       this.customerInfo = result.customerInfo;
       logger.log(`✅ Purchase successful: ${type}`);
       return { success: true, customerInfo: result.customerInfo };
-      
+
     } catch (error: any) {
       logger.error('❌ Purchase failed:', error);
-      
+
       const errorCode = error.code;
       const errorMessage = error.message || '';
-      
+
       if (errorCode === 'STORE_PURCHASE_CANCELLED' || errorMessage.toLowerCase().includes('cancelled')) {
         return { success: false, error: 'Purchase was cancelled', errorCode: 'cancelled' };
       }
-      
+
       if (errorCode === 'STORE_PURCHASE_PENDING' || errorMessage.toLowerCase().includes('pending')) {
         return { success: false, error: 'Purchase is pending approval', errorCode: 'pending' };
       }
-      
+
       if (errorCode === 'STORE_PRODUCT_ALREADY_OWNED' || errorMessage.toLowerCase().includes('already')) {
         return { success: false, error: 'You already own this product', errorCode: 'already_owned' };
       }
-      
+
       if (errorCode === 'NETWORK_ERROR' || errorMessage.toLowerCase().includes('network')) {
         return { success: false, error: 'Network error. Please check your connection.', errorCode: 'network_error' };
       }
-      
+
       return { success: false, error: errorMessage || 'Purchase failed', errorCode: errorCode };
     }
   }
 
-  async purchaseProduct(productId: string): Promise<{ 
-    success: boolean; 
-    customerInfo?: CustomerInfo; 
+  async purchaseProduct(productId: string): Promise<{
+    success: boolean;
+    customerInfo?: CustomerInfo;
     error?: string;
     errorCode?: string;
   }> {
     const packageType = PRODUCT_MAP[productId];
-    
+
     if (!packageType) {
       return { success: false, error: `Unknown product ID: ${productId}` };
     }
-    
+
     return this.purchasePackage(packageType);
   }
 
@@ -458,7 +502,7 @@ class RevenueCatService {
     if (!Capacitor.isNativePlatform()) {
       return { success: false, error: 'Restore only available in mobile app' };
     }
-    
+
     if (!this.initialized) {
       return { success: false, error: 'Purchase system not initialized' };
     }

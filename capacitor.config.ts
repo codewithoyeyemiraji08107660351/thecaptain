@@ -5,6 +5,10 @@ const config: CapacitorConfig = {
   appName: 'The Captain',
   webDir: 'dist',
 
+  ios: {
+    backgroundColor: '#0f1015',
+  },
+
   android:{
     allowMixedContent: true,
   },
