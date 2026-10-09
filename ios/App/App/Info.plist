@@ -291,9 +291,6 @@
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
 
-    <!-- ✅ Required for apps using Push Notifications -->
-    <key>aps-environment</key>
-    <string>production</string>
 
 </dict>
 </plist>
