@@ -29,7 +29,7 @@
     <string>1.0.1</string>
 
     <key>CFBundleVersion</key>
-    <string>2</string>
+    <string>3</string>
 
     <!-- ==================== IOS SETTINGS ==================== -->
     <key>LSRequiresIPhoneOS</key>
@@ -124,9 +124,6 @@
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>The Captain needs permission to save photos to your library.</string>
 
-    <!-- ==================== TRACKING PERMISSION ==================== -->
-    <key>NSUserTrackingUsageDescription</key>
-    <string>This identifier helps us show relevant ads and improve your experience.</string>
 
     <!-- ==================== ADMOB APP ID (PRODUCTION) ==================== -->
     <!-- ✅ UNCOMMENT THIS FOR PRODUCTION -->
